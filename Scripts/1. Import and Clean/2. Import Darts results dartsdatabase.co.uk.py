@@ -68,12 +68,13 @@ for num in range(1,max_player_page +1):
     	#track progress
     count += 1 
 
-
 players_df.to_excel(root+"Data/dartsdatabase/Players.xlsx")
 
 results_cols = ['player_name', 'date', 'event', 'category', 'event_round', 'result', 'opponent', 'score']
 
 results_df = pd.DataFrame(columns=results_cols)
+
+players_df = players_df[players_df.rank > 60 & players_df.rank < 301]
 
 
 #loop through player list
@@ -101,6 +102,7 @@ for index, player in players_df.iterrows():
             #Remove header again
             header = results_rows.pop(0)
             
+            #if no table on page - move onto next player
             if len(results_rows) < 2:
                 flag = False
                 break
@@ -119,21 +121,20 @@ for index, player in players_df.iterrows():
                 result_hash = {'player_name': player_name, 'date': date, 'event': event, 'category': category, 'event_round': event_round, 'result': result, 'opponent': opponent, 'score': score}
                 results_df = results_df.append(result_hash,ignore_index=True)
         
-        
+        #If getting results data threw an error, move onto next page
         except:
             flag = False
             break
 			#print sample output
         
     #measure progress. Save to Excel every 10 players
-    count += 1
     print(player)
     print('Pages: ', str(page_count-1))
     if count % 10 == 0:
-        results_df.to_excel(root+"Data/dartsdatabase/Results.xlsx")
-    print('Count: ',count)
+        results_df.to_excel(root+"Data/dartsdatabase/Results2.xlsx")
+    print('Count: ',index)
     print()
     
 #save as Excel
 
-results_df.to_excel(root+"/dartsdatabase/Results.xlsx")
+results_df.to_excel(root+"/dartsdatabase/Results2.xlsx")

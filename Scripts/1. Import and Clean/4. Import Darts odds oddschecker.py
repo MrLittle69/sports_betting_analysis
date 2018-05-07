@@ -5,7 +5,7 @@ import pandas as pd
 
 from IPython import embed
 
-root = "/Users/oli/Desktop/tennis_analysis"
+root = "C:/Users/oliver.cairns/Desktop/sports_betting_analysis/"
 
 start_year, end_year = [2010,2018]
 
@@ -16,27 +16,51 @@ chrome_options.add_argument("--window-size=1920x1080")
 
 # download the chrome driver from https://sites.google.com/a/chromium.org/chromedriver/downloads and put it in the
 # current directory
-chrome_driver = os.getcwd() + "/chromedriver"
+chrome_driver = os.getcwd() + "/chromedriver.exe"
 
-tournament_names = ["premier-league-","pdc-world-championship-","grand-slam-"]
+tournament_names = ["premier-league","pdc-world-championship"]
 
 driver = webdriver.Chrome(chrome_options=chrome_options, executable_path=chrome_driver)
 
+odds_df = pd.DataFrame()
 
-odds_cols = ['player_1','player_2','result','tournament_name','year']
+#1. scrape all tournaments
 
-odds_df = pd.DataFrame(columns=odds_cols)
+tourn_list_url = "http://www.oddsportal.com/darts/results/"
 
-for tourn in tournament_names:
+driver.get(tourn_list_url)
 
+table = driver.find_element_by_class_name("table-main")
+
+links = table.find_elements_by_tag_name('a')
+
+#Find all the HREFS in the table
+links = [x.get_attribute('href') for x in links]
+
+#Keep only the ones with the word results. These are actual tournaments. 
+#Also drop the /results bit because we will add - year in between
+
+tourns = [link.replace('/results/','') for link in links if '/results/' in link]
+
+for i, tourn in enumerate(tourns):
+    print('--------------')
+    print(i)
+    
     for year in range(start_year,end_year+1):
-        page_url = "http://www.oddsportal.com/darts/world/" + \
-        str(year) + "/results/"
+        print('Tournament: ',tourn)
+        print('Year: ',year)
+        print()
+        if year == 2018:
+            page_url = tourn + "/results/"
+        else:
+            page_url = tourn + "-" + str(year) + "/results/"
+        
+        print(page_url)
         try:
             driver.get(page_url)
 
             table = driver.find_element_by_id('tournamentTable')
-            rows = table.find_elements_by_class('deactivate')
+            rows = table.find_elements_by_class_name('deactivate')
             for row in rows:
                 try:
                     players = row.find_element_by_class_name('name').text
@@ -45,12 +69,15 @@ for tourn in tournament_names:
                     odds_2 = row.find_elements_by_class_name('odds-nowrp')[1].text
                     #add atrributes to list
                     odds_hash = {'players':players, 'odds_1': odds_1, \
-                        'odds_2': odds_2, 'year': year,'tournament_name':tourn}
+                        'odds_2': odds_2, 'year': year,'tournament_name':tourn,'score':score}
                     odds_df = odds_df.append(odds_hash,ignore_index=True)
                 except:
+                    print('fail')
                     pass
+                    
         except:
             pass
+    if i % 5 == 0:
+        odds_df.to_excel(root+"/Data/oddschecker/Darts_odds.xlsx")
 
-print(odds_df)
-embed()
+odds_df.to_excel(root+"/Data/oddschecker/Darts_odds.xlsx")
