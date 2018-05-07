@@ -46,11 +46,11 @@ for tourn in tournament_names:
                     #add atrributes to list
                     odds_hash = {'players':players, 'odds_1': odds_1, \
                         'odds_2': odds_2, 'year': year,'tournament_name':tourn}
-                    results_df = results_df.append(odds_hash,ignore_index=True)
+                    odds_df = odds_df.append(odds_hash,ignore_index=True)
                 except:
                     pass
         except:
             pass
 
-print(results_df)
+print(odds_df)
 embed()

@@ -79,7 +79,6 @@ results_df = pd.DataFrame(columns=results_cols)
 #loop through player list
 for index, player in players_df.iterrows():
     player_link = player['link']
-    print(index)
     page_count = 0
     flag = True
     
@@ -91,7 +90,7 @@ for index, player in players_df.iterrows():
             #Make URL with specific player and page number
             page_link = 'http://www.dartsdatabase.co.uk/' + player_link + "&organPd=All&tourns=All&plStat=2&pg=" + \
             str(page_count) + "#PlayerResults"
-
+    
             
             page = requests.get(page_link)
             parsed = bs4.BeautifulSoup(page.content,'lxml') 
@@ -102,11 +101,10 @@ for index, player in players_df.iterrows():
             #Remove header again
             header = results_rows.pop(0)
             
-            if len(results_rows) == 0:
-                continue
-            
-            embed()
-
+            if len(results_rows) < 2:
+                flag = False
+                break
+    
             for row in results_rows:
                 #find specific result and add to list
                 attributes = row.find_all('td')
@@ -119,22 +117,22 @@ for index, player in players_df.iterrows():
                 score = attributes[6].get_text()
                 player_name = player['name']
                 result_hash = {'player_name': player_name, 'date': date, 'event': event, 'category': category, 'event_round': event_round, 'result': result, 'opponent': opponent, 'score': score}
-                results_df = results_df.append(result_hash)
-    
-        except:
-            print('Player: ',player)
-            print('Pages: ', str(page_count-1))
-            continue
+                results_df = results_df.append(result_hash,ignore_index=True)
         
+        
+        except:
+            flag = False
+            break
 			#print sample output
         
     #measure progress. Save to Excel every 10 players
     count += 1
-    print('Player: ',player)
+    print(player)
     print('Pages: ', str(page_count-1))
     if count % 10 == 0:
         results_df.to_excel(root+"Data/dartsdatabase/Results.xlsx")
-    print(count)
+    print('Count: ',count)
+    print()
     
 #save as Excel
 
