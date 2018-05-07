@@ -2,6 +2,8 @@ from time import sleep
 import pandas as pd
 import bs4
 import requests
+from IPython import embed
+
 
 # params
 player_url = 'http://www.dartsdatabase.co.uk/PlayerStats.aspx?statKey=1&pg='
@@ -11,7 +13,7 @@ waiting_period = 0
 max_player_page = 10
 max_results_page = 60
 
-root = "C:/Users/oliver.cairns/Desktop/tennis_analysis/"
+root = "C:/Users/oliver.cairns/Desktop/sports_betting_analysis/"
 
 headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36'}
 
@@ -65,18 +67,15 @@ for num in range(1,max_player_page +1):
 	
     	#track progress
     count += 1 
-    if count % 10 == 0:
-        players_df.to_excel(root+"/dartsdatabase/Players.xlsx")
-    print(count)
-
-players_df.to_excel(root+"/dartsdatabase/Players.xlsx")
 
 
-#which subset of players do you want to find results for? (delete if all)
-#players_list = players_list[300:500]
+players_df.to_excel(root+"Data/dartsdatabase/Players.xlsx")
 
-#will store each result as a list of dicts
-results_list = []
+results_cols = ['player_name', 'date', 'event', 'category', 'event_round', 'result', 'opponent', 'score']
+
+results_df = pd.DataFrame(columns=results_cols)
+
+
 #loop through player list
 for index, player in players_df.iterrows():
     player_link = player['link']
@@ -92,6 +91,7 @@ for index, player in players_df.iterrows():
             #Make URL with specific player and page number
             page_link = 'http://www.dartsdatabase.co.uk/' + player_link + "&organPd=All&tourns=All&plStat=2&pg=" + \
             str(page_count) + "#PlayerResults"
+
             
             page = requests.get(page_link)
             parsed = bs4.BeautifulSoup(page.content,'lxml') 
@@ -100,9 +100,12 @@ for index, player in players_df.iterrows():
             results_rows = tables[4].find_all('tr')
             
             #Remove header again
-            results_rows.pop(0)
+            header = results_rows.pop(0)
+            
             if len(results_rows) == 0:
                 continue
+            
+            embed()
 
             for row in results_rows:
                 #find specific result and add to list
@@ -116,7 +119,7 @@ for index, player in players_df.iterrows():
                 score = attributes[6].get_text()
                 player_name = player['name']
                 result_hash = {'player_name': player_name, 'date': date, 'event': event, 'category': category, 'event_round': event_round, 'result': result, 'opponent': opponent, 'score': score}
-                results_list.append(result_hash)
+                results_df = results_df.append(result_hash)
     
         except:
             print('Player: ',player)
@@ -125,12 +128,14 @@ for index, player in players_df.iterrows():
         
 			#print sample output
         
-    #measure progress
+    #measure progress. Save to Excel every 10 players
     count += 1
     print('Player: ',player)
     print('Pages: ', str(page_count-1))
-#save as csv
+    if count % 10 == 0:
+        results_df.to_excel(root+"Data/dartsdatabase/Results.xlsx")
+    print(count)
+    
+#save as Excel
 
-results_df = pd.DataFrame(data=results_list)
-
-players_df.to_excel(root+"/dartsdatabase/Results.xlsx")
+results_df.to_excel(root+"/dartsdatabase/Results.xlsx")
