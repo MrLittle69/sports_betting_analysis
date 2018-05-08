@@ -118,6 +118,19 @@ odds_df['Surname 2'] = odds_df['Player 2'].str.slice(0,-2).str.upper().str.strip
 
 odds_df['Tourn']=odds_df['tournament_name'].str.split('/').str.get(-1).str.replace("-"," ").str.upper()
 
+#Same odds, the opposite way around
+opp_df = odds_df.copy()
+
+opp_df.rename(index=str, \
+columns= {"odds_1": "odds_2", "odds_2": "odds_1","Player 1":"Player 2","Player 2":"Player 1","Surname 1":"Surname 2", \
+"Surname 2":"Surname 1"},inplace=True)
+
+#No
+opp_df['score']=opp_df['score'].apply(lambda x: x[::-1])
+
+odds_df = odds_df.append(opp_df,ignore_index=True)
+    
+    
 combined_df = pd.merge(odds_df, elo_df,  how='outer',left_on=['Surname 1','Surname 2','Tourn','score'],right_on=['Surname 1','Surname 2','Tourn','score'],indicator=True)
 
 print(combined_df['_merge'].value_counts())
