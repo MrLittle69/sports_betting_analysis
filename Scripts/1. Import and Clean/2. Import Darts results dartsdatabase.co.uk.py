@@ -74,7 +74,7 @@ results_cols = ['player_name', 'date', 'event', 'category', 'event_round', 'resu
 
 results_df = pd.DataFrame(columns=results_cols)
 
-players_df = players_df[players_df.rank > 60 & players_df.rank < 301]
+#players_df = players_df[(players_df.rank > 60) & (players_df.rank < 301)]
 
 
 #loop through player list

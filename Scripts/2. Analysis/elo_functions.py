@@ -14,8 +14,10 @@ def calc_winning_chances(ratings_dict, first_player,second_player):
 	q2 = 10.0 ** rating_2
 	return q1/(q1+q2)
 
-
-
+def get_ratings(first_player,second_player,ratings_dict):
+     rating_1 = ratings_dict[first_player]['current_rating']
+     rating_2 = ratings_dict[second_player]['current_rating'] 
+     return [rating_1,rating_2]
 #updates the global ratings_dict, given a single game + k-factor
 def update_elos_and_winning_chances(game,game_index,ratings_dict,k_factor,elo_df,ratings_dummy):
     first_player=game['Player 1']
@@ -29,8 +31,8 @@ def update_elos_and_winning_chances(game,game_index,ratings_dict,k_factor,elo_df
     if ratings_dummy:       
         e2 = 1.0 - e1
         date = game['Date']
-        rating_1 = ratings_dict[first_player]['current_rating']
-        rating_2 = ratings_dict[second_player]['current_rating']
+        
+        rating_1, rating_2 = get_ratings(first_player,second_player,ratings_dict)
         ratings_dict[first_player]['historic_ratings'].append(rating_1)
         ratings_dict[second_player]['historic_ratings'].append(rating_2)
         ratings_dict[first_player]['historic_predictions'].append(e1)
