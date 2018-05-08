@@ -93,8 +93,8 @@ for player_name in elo_df['Player 1'].unique():
     already.append(player_name)
 
 #Keep surname only
-elo_df['Surname 1'] = elo_df['Player 1'].str.split(' ',n=1).str.get(1).str.upper()
-elo_df['Surname 2'] = elo_df['Player 2'].str.split(' ',n=1).str.get(1).str.upper()
+elo_df['Surname 1'] = elo_df['Player 1'].str.split(' ',n=1).str.get(1).str.upper().str.strip()
+elo_df['Surname 2'] = elo_df['Player 2'].str.split(' ',n=1).str.get(1).str.upper().str.strip()
 
 
 
@@ -110,15 +110,15 @@ elo_df.sort_values(by=['Date'],inplace=True)
 
 odds_df = pd.read_excel(root + "/Data/oddschecker/Darts_odds.xlsx")
 
-odds_df['Player 1'] = odds_df['players'].str.split('-',n=1).str.get(0)
-odds_df['Player 2'] = odds_df['players'].str.split('-',n=1).str.get(1)
+odds_df['Player 1'] = odds_df['players'].str.split(' - ',n=1).str.get(0)
+odds_df['Player 2'] = odds_df['players'].str.split(' - ',n=1).str.get(1)
 
-odds_df['Surname 1'] = odds_df['Player 1'].str.slice(0,-4).str.upper()
-odds_df['Surname 2'] = odds_df['Player 2'].str.slice(0,-3).str.upper()
+odds_df['Surname 1'] = odds_df['Player 1'].str.slice(0,-2).str.upper().str.strip()
+odds_df['Surname 2'] = odds_df['Player 2'].str.slice(0,-2).str.upper().str.strip()
 
 odds_df['Tourn']=odds_df['tournament_name'].str.split('/').str.get(-1).str.replace("-"," ").str.upper()
 
-combined_df = pd.merge(odds_df, elo_df,  how='outer',left_on=['Player 1','Player 2'],right_on=['Player 1','Player 2'],indicator=True)
+combined_df = pd.merge(odds_df, elo_df,  how='outer',left_on=['Surname 1','Surname 2','Tourn','score'],right_on=['Surname 1','Surname 2','Tourn','score'],indicator=True)
 
 print(combined_df['_merge'].value_counts())
 """
