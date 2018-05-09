@@ -12,12 +12,10 @@ from matplotlib import pyplot as plt
 from scipy import optimize
 import numpy as np
 
-#Solve recursive formula for base case, designed to be applied rowwise to pandas df
-def match_winning_odds(args):
-    e1, rating_1, rating_2, match_total, k_factor = args
-    wins_1 = 0.0
-    wins_2 = 0.0
-    return elo.match_winning_prob(e1, rating_1,rating_2,wins_1,wins_2,match_total,k_factor)
+def convert_frac_to_prob(frac):
+    if "/" in frac:
+        num, denom = frac.split("/")
+        return int(denom) / (int(num) + int(denom))
 
 
 #Check strategy profitability different confidence thresholds (how much does payoff have to exceed odds for me to bet?)
@@ -26,20 +24,26 @@ def check_profitability(df,thresholds):
     for threshold in thresholds:
     
         #Which cases would we have bet and won?
-        model_wins = df[df['model_prob'] > df['winner_prob'] + threshold]
+        p1_wins = df[(df['model_p1_prob'] > df['p1_prob'] + threshold) & (df['Outcome'] == 1.0)]
+        
+        p1_losses = df[(df['model_p1_prob'] > df['p1_prob'] + threshold) & (df['Outcome'] == 0.0)]
+        
+
+        #Which cases would we have lost?
+        p2_wins = df[(df['model_p2_prob'] < df['p2_prob'] - threshold) & (df['Outcome'] == 0.0)]
+        
+        p2_losses = df[(df['model_p2_prob'] < df['p2_prob'] - threshold) & (df['Outcome'] == 1.0)]
         
         #What was they net payoff in those cases for a bet of value 1? 
-        total_wins = np.sum(1.0 / model_wins['winner_prob'] - 1)
+        total_wins = np.sum(1.0 / p1_wins['p1_prob'] - 1) + np.sum(1.0 / p2_wins['p2_prob'] - 1)
         
-        #Which cases would we have lost?
-        model_losses = df['model_loser_prob'] < df['loser_prob'] - threshold
-    
+        
         #what was the net payoff in these cases (-1)
-        total_losses = np.count_nonzero(model_losses)
+        total_losses = np.count_nonzero(p1_losses) +  np.count_nonzero(p2_losses)
     
         #print net payoff at threshold 
         print('threshold: ',str(threshold))
-        print('payoff: ',total_wins-total_losses)
+        print('payoff: ',total_wins - total_losses)
         print()
 
 
@@ -103,12 +107,12 @@ elo_df['Date'] = pd.to_datetime(elo_df['Date'])
 
 elo_df['year'] =elo_df['Date'].dt.year
 
-#Earliest fixtures first
-elo_df.sort_values(by=['Date'],inplace=True)
-
 #Merge on odds data - quite crude.
 
 odds_df = pd.read_excel(root + "/Data/oddschecker/Darts_odds.xlsx")
+
+odds_df['p1_prob'] = odds_df['odds_1'].apply(convert_frac_to_prob)
+odds_df['p2_prob'] = odds_df['odds_2'].apply(convert_frac_to_prob)
 
 odds_df['Player 1'] = odds_df['players'].str.split(' - ',n=1).str.get(0)
 odds_df['Player 2'] = odds_df['players'].str.split(' - ',n=1).str.get(1)
@@ -125,26 +129,30 @@ opp_df.rename(index=str, \
 columns= {"odds_1": "odds_2", "odds_2": "odds_1","Player 1":"Player 2","Player 2":"Player 1","Surname 1":"Surname 2", \
 "Surname 2":"Surname 1"},inplace=True)
 
-#No
+#Doesn't work for games > 10.
 opp_df['score']=opp_df['score'].apply(lambda x: x[::-1])
 
 odds_df = odds_df.append(opp_df,ignore_index=True)
     
     
-combined_df = pd.merge(odds_df, elo_df,  how='outer',left_on=['Surname 1','Surname 2','Tourn','score'],right_on=['Surname 1','Surname 2','Tourn','score'],indicator=True)
+elo_df = pd.merge(odds_df, elo_df,  how='right',left_on=['Surname 1','Surname 2','Tourn','score'],right_on=['Surname 1','Surname 2','Tourn','score'],indicator=True)
 
-print(combined_df['_merge'].value_counts())
-"""
+#Earliest fixtures first
+elo_df.sort_values(by=['Date'],inplace=True)
+
+elo_df.rename(index=str, \
+columns= {"Player 1_y":"Player 1","Player 2_y":"Player 2"},inplace=True)
+
 #For now, need to have the optimisation function in this file.
 def optimize_brier(k_factor,args=(elo_df)):
     return elo.calc_brier_and_elos(elo_df,k_factor,ratings_dummy=False)
 
 #Finds the optimal k factor using optimisation routine - takes quite a long time. Using output from last run.
-
+"""
 optimization = optimize.minimize(optimize_brier,method='BFGS',x0=23)
 print(optimization)
 k_star= optimization['x'] 
-
+"""
 k_star =   28.18944097
 
 #Output data is the match level data (now with columns for player 1 winning chance and player 1 and 2 rating prior to game)
@@ -156,4 +164,16 @@ plt.plot(ratings_dict['Phil Taylor']['historic_dates'],ratings_dict['Phil Taylor
 plt.plot(ratings_dict['James Wade']['historic_dates'],ratings_dict['James Wade']['historic_ratings'],'purple',label='James Wade')
 plt.legend(loc='upper left')
 plt.show()
-"""
+
+#Only evaluate betting on games after 1st 2 years - allow ELO to callibrate
+betting_df = output_data[(output_data['Date'].dt.year < 2017) & output_data['p1_prob'].notnull()]
+
+#Compute my model's match winning odds. Hopefully they are more accurate than bookmaker :)
+betting_df['model_p1_prob'] = betting_df['e1']
+betting_df['model_p2_prob'] = 1.0 - betting_df['model_p1_prob']
+
+#check profitability, with different thresholds = how much higher my probability has to be than bookie odds before I bet.
+check_profitability(df=betting_df,thresholds = [0,0.01,0.05,0.10,0.2])
+
+#Export betting df - easy to check
+betting_df.to_excel(root + "Data/Outputs/3. Darts pre 2016.xlsx")
