@@ -10,7 +10,8 @@ import math
 from matplotlib import pyplot as plt
 from scipy import optimize
 import numpy as np
-import elo
+import os
+
 """
 Source: http://glicko.net/glicko/glicko2.pdf
 
@@ -122,31 +123,17 @@ Step 8
                      
 """
 
-TAU = 0.6
-EPSILON = 0.000001
+def calc_g_ij(RD_j):
+    return 1.0/math.sqrt((1+(3*RD_j**2))/math.pi**2)
 
+def calc_E_ij(rat_i,rat_j,g_ij):
+    return 1.0/(1 + math.exp(-g_ij*(rat_i - rat_j)))
 
-def g(RD):
-    return 1.0/math.sqrt((1+(3*RD**2))/math.pi**2)
+def calc_v_inv_ij(E_ij,g_ij):
+    return (g_ij ** 2) * E_ij * (1 - E_ij)
 
-def E(rating,rating_j,RD_j):
-    return 1.0/(1 + math.exp(-g(RD_j)*(rating - rating_j)))
-
-def v_and_delta(player_matches,player_name,ratings_dict):
-    rating = ratings_dict[player_name]['rating']
-    v_total = 0.0
-    delta_total = 0.0
-    
-    for match_j in player_matches:
-        rating_j = ratings_dict[player_matches['rival_name']]['rating']
-        RD_j = ratings_dict[player_matches['rival_name']]['RD']
-        s_j = player_matches['outcome']
-        E_j =E(rating,rating_j,RD_j)
-        g_j = g(RD_j)
-        v_total +=  (g_j**2)*E_j*(1-E_j)
-        delta_total += g_j*(s_j- E_j)
-        
-    return 1.0/v_total, delta_total
+def calc_delta_ij(E_ij,g_ij,outcome):
+    return g_ij  * (outcome - E_ij)
 
 def f(x,delta_i,RD_i,v_i,TAU,a):
     e_x = math.exp(x)
@@ -154,17 +141,16 @@ def f(x,delta_i,RD_i,v_i,TAU,a):
     bottom_a = 2*((RD_i**2+v_i+e_x)**2)
     return top_a/bottom_a + (x-a)/(TAU**2)
 
-def update_vol_i(player_matches,player_name,ratings_dict):
-    vol_i = ratings_dict[player_name]['vol']
-    RD_i = ratings_dict[player_name]['RD']
+def update_vol_i(vol_i,v_i,delta_i,RD_i):
     A = math.log(vol_i**2)
-    v_i, delta_i = v_and_delta(player_matches,player_name,ratings_dict)
     if vol_i**2 > RD_i**2 + v_i:
         B = math.log(vol_i**2 - RD_i**2 - v_i)
     else:
         k = 1
-        while f(A - k*TAU) < 0:
+        x = A - k*TAU
+        while f(x,delta_i,RD_i,v_i,TAU,A) < 0:
             k +=1
+            x = A - k*TAU
         B = A - k*TAU
     Fa = f(A)
     Fb = f(B)
@@ -180,20 +166,19 @@ def update_vol_i(player_matches,player_name,ratings_dict):
         Fb = Fc
     return math.exp(A/2)
         
-def update_rd_i(RD_i,sigma_i):
-    return math.sqrt(RD_i**2,sigma_i**2)
+def update_rd_i(RD_i,v_i,vol_i):
+    RD_pre_i = RD_i**2 + vol_i**2
+    return 1/ math.sqrt(1/RD_pre_i + 1/ v_i)
     
+def update_rat_i(RD_i,rat_i,perf_sum_i):
+    return rat_i + ((RD_i**2)*perf_sum_i)
 
-            
-
-
-#Solve recursive formula for base case, designed to be applied rowwise to pandas df
-def match_winning_odds(args):
+#Need to impliment
+def apply_match_winning_odds(args):
     e1, rating_1, rating_2, match_total, k_factor = args
     wins_1 = 0.0
     wins_2 = 0.0
-    return elo.match_winning_prob(e1, rating_1,rating_2,wins_1,wins_2,match_total,k_factor)
-
+    pass
 
 #Check strategy profitability different confidence thresholds (how much does payoff have to exceed odds for me to bet?)
 def check_profitability(df,thresholds):
@@ -217,38 +202,77 @@ def check_profitability(df,thresholds):
         print('payoff: ',total_wins-total_losses)
         print()
 
+def update_glikos(period_df):
+    
+    pass
 
 ############################################################################
 #1. Load cleaned Tennis data 
 ############################################################################
 
-root = "C:/Users/oliver.cairns/Desktop/sports_betting_analysis/"
+CURRENT_DIR = os.getcwd()
 
-elo_df = pd.read_csv(root + "Data/tennis-data.co.uk/Clean data 2001 - 2016.csv")
+ROOT = CURRENT_DIR.replace("Scripts\\2. Analysis","")
+
+MATCHES_DF = pd.read_csv(ROOT + "Data\\tennis-data.co.uk\\Clean data 2001 - 2016.csv",index_col=0)
+
+TAU = 0.6
+EPSILON = 0.000001
 
 #Other cleaning and sorting
-elo_df['Date'] = pd.to_datetime(elo_df['Date'])
-
+MATCHES_DF['Date'] = pd.to_datetime(MATCHES_DF['Date'])
 
 #Looking at match level data. Therefore only taking 1 observation per match, and first one (with starting ELOs)
-elo_df = elo_df[elo_df['set_num']==1]
+MATCHES_DF = MATCHES_DF[MATCHES_DF['set_num']==1]
+
+MATCHES_DF.drop(['winner_prob','loser_prob','set_num','first_to','Surface'],axis=1,inplace=True)
 
 #Winner of ovearll match is always player 1
-elo_df['Outcome'] = 1.0
+MATCHES_DF['Outcome'] = 1.0
 
-elo_df['Year-Month'] = elo_df['Date'].dt.to_period('M')
+#Duplicate df
+opp_df = MATCHES_DF.copy()
 
+opp_df['Outcome'] = 0.0
+opp_df.rename(index=str,columns = {"Player 1":"Player 2","Player 2":"Player 1"},inplace=True)
 
-unique_players = set(elo_df['Player 1']).union(set(elo_df['Player 2']))
+MATCHES_DF = MATCHES_DF.append(opp_df,ignore_index=True,sort=True)
 
-vol_change = 0.75
+MATCHES_DF['Year-Month'] = MATCHES_DF['Date'].dt.to_period('M')
 
-ratings_df = pd.DataFrame(columns = ['player','rating','RD','vol'])
+UNIQ_PLAYERS = MATCHES_DF['Player 1'].unique()
 
-for player in unique_players:
-    ratings_df.append({'player':player,'rating':0,'RD':350/173.7178,'vol':0.06})
-    
-uniq_months=  elo_df['Year-Month'].unique()
+RATINGS_DF = pd.DataFrame(index=UNIQ_PLAYERS)
 
-for month in uniq_months:
-    period_df = elo_df[elo_df['Year-Month']==month]
+RATINGS_DF['rat'] = 0
+
+RATINGS_DF['RD'] = 350/173.7178
+
+RATINGS_DF['vol'] = 0.06
+
+#Testing
+period_df = MATCHES_DF[MATCHES_DF['Year-Month']== MATCHES_DF['Year-Month'].min()]
+
+#Merge on both player's ratings
+period_df = pd.merge(period_df,RATINGS_DF,how='inner',left_on='Player 1',right_index=True)
+period_df.rename(index=str,columns = {"rat":"rat_1","RD":"RD_1","vol":"vol_1"},inplace=True)
+period_df = pd.merge(period_df,RATINGS_DF,how='inner',left_on='Player 2',right_index=True)
+period_df.rename(index=str,columns = {"rat":"rat_2","RD":"RD_2","vol":"vol_2"},inplace=True)
+period_df['g_12'] = period_df['RD_1'].apply(calc_g_ij)
+period_df['E_12'] = period_df.apply(lambda row: calc_E_ij(row['rat_1'],row['rat_2'],row['g_12']),axis=1)
+period_df['v_12'] = period_df.apply(lambda row: calc_v_inv_ij(row['E_12'],row['g_12']),axis=1)
+period_df['perf_sum_12'] = period_df.apply(lambda row: calc_delta_ij(row['E_12'],row['g_12'],row['Outcome']),axis=1)
+period_agg_df = period_df[['Player 1','v_12','perf_sum_12']].groupby('Player 1').sum()
+del period_df
+period_agg_df['v'] = 1/period_agg_df['v_12'] 
+period_agg_df['delta'] = period_agg_df['v'] *period_agg_df['perf_sum_12']
+period_agg_df.drop(['v_12'],axis=1,inplace=True)
+period_agg_df = pd.merge(period_agg_df,RATINGS_DF,how='inner',left_on='Player 1',right_index=True)
+period_agg_df['vol_new'] = period_agg_df.apply(lambda row: update_vol_i(row['vol'],row['v'],row['delta'],row['RD']),axis=1)
+period_agg_df['RD_new'] = period_agg_df.apply(lambda row: update_rd_i(row['RD'],row['v']),axis=1)
+period_agg_df['rat_new'] = period_agg_df.apply(lambda row: update_rat_i(row['RD_new'],row['rat'],row['perf_sum_12']),axis=1)
+
+#for period in MATCHES_DF['Year-Month'].unique():
+#    period_df = MATCHES_DF[MATCHES_DF['Year-Month']==period]
+#    period_df.merge
+#    update_glikos(period_df) 
