@@ -139,24 +139,28 @@ def f(x,delta_i,RD_i,v_i,TAU,a):
     e_x = math.exp(x)
     top_a = (e_x*(delta_i**2-RD_i**2-v_i-e_x))
     bottom_a = 2*((RD_i**2+v_i+e_x)**2)
-    return top_a/bottom_a + (x-a)/(TAU**2)
+    return top_a/bottom_a - (x-a)/(TAU**2)
 
 def update_vol_i(vol_i,v_i,delta_i,RD_i):
     A = math.log(vol_i**2)
+    a = math.log(vol_i**2)
     if vol_i**2 > RD_i**2 + v_i:
         B = math.log(vol_i**2 - RD_i**2 - v_i)
     else:
         k = 1
         x = A - k*TAU
-        while f(x,delta_i,RD_i,v_i,TAU,A) < 0:
+        f_current = f(x,delta_i,RD_i,v_i,TAU,a)
+        while f_current < 0:
             k +=1
             x = A - k*TAU
+            f_current = f(x,delta_i,RD_i,v_i,TAU,a)
         B = A - k*TAU
-    Fa = f(A)
-    Fb = f(B)
-    while abs(B - A) > EPSILON:
+    Fa = f(A,delta_i,RD_i,v_i,TAU,a)
+    Fb = f(B,delta_i,RD_i,v_i,TAU,a)
+    A_B_diff = abs(B-A)
+    while A_B_diff > EPSILON:
         C = A + ((A-B)*Fa)/ (Fb - Fa)
-        Fc = f(C)
+        Fc = f(C,delta_i,RD_i,v_i,TAU,a)
         if Fc*Fb < 0:
             A = B
             Fa = Fb
@@ -164,6 +168,7 @@ def update_vol_i(vol_i,v_i,delta_i,RD_i):
             Fa /= 2
         B = C
         Fb = Fc
+        A_B_diff = abs(B-A)
     return math.exp(A/2)
         
 def update_rd_i(RD_i,v_i,vol_i):
@@ -172,6 +177,47 @@ def update_rd_i(RD_i,v_i,vol_i):
     
 def update_rat_i(RD_i,rat_i,perf_sum_i):
     return rat_i + ((RD_i**2)*perf_sum_i)
+
+def update_glickos(period_df):
+    #Merge on both player's ratings
+    ##Preprocessing
+    period_df = pd.merge(period_df,RATINGS_DF,how='inner',left_on='Player 1',right_index=True)
+    period_df.rename(index=str,columns = {"rat":"rat_1","RD":"RD_1","vol":"vol_1"},inplace=True)
+    period_df = pd.merge(period_df,RATINGS_DF,how='inner',left_on='Player 2',right_index=True)
+    period_df.rename(index=str,columns = {"rat":"rat_2","RD":"RD_2","vol":"vol_2"},inplace=True)
+    
+    #Step 3 (not summed or inverted)
+    period_df['g_12'] = period_df['RD_1'].apply(calc_g_ij)
+    period_df['E_12'] = period_df.apply(lambda row: calc_E_ij(row['rat_1'],row['rat_2'],row['g_12']),axis=1)
+    period_df['v_12'] = period_df.apply(lambda row: calc_v_inv_ij(row['E_12'],row['g_12']),axis=1)
+    
+    #Step 4 (not summed or multiplied by v)
+    period_df['perf_sum_12'] = period_df.apply(lambda row: calc_delta_ij(row['E_12'],row['g_12'],row['Outcome']),axis=1)
+    
+    #Sum by player
+    period_agg_df = period_df[['Player 1','v_12','perf_sum_12']].groupby('Player 1').sum()
+    del period_df
+    
+    #Complete 3 (invert)
+    period_agg_df['v'] = 1/period_agg_df['v_12'] 
+    
+    #Complete 4 (multiply by v)
+    period_agg_df['delta'] = period_agg_df['v'] *period_agg_df['perf_sum_12']
+    period_agg_df.drop(['v_12'],axis=1,inplace=True)
+    
+    #Merge ratings again
+    period_agg_df = pd.merge(period_agg_df,RATINGS_DF,how='inner',left_on='Player 1',right_index=True)
+ 
+    #Step 5 (most compute intensive - todo - check works and then optimise)
+    period_agg_df['vol'] = period_agg_df.apply(lambda row: update_vol_i(row['vol'],row['v'],row['delta'],row['RD']),axis=1)
+     
+    #Steps 6-7
+    period_agg_df['RD'] = period_agg_df.apply(lambda row: update_rd_i(row['RD'],row['v'],row['vol']),axis=1)
+    period_agg_df['rat'] = period_agg_df.apply(lambda row: update_rat_i(row['RD'],row['rat'],row['perf_sum_12']),axis=1)
+
+    output = period_agg_df[['rat','RD','vol']]
+    #Return new figures
+    return output
 
 #Need to impliment
 def apply_match_winning_odds(args):
@@ -202,9 +248,6 @@ def check_profitability(df,thresholds):
         print('payoff: ',total_wins-total_losses)
         print()
 
-def update_glikos(period_df):
-    
-    pass
 
 ############################################################################
 #1. Load cleaned Tennis data 
@@ -251,28 +294,14 @@ RATINGS_DF['RD'] = 350/173.7178
 RATINGS_DF['vol'] = 0.06
 
 #Testing
-period_df = MATCHES_DF[MATCHES_DF['Year-Month']== MATCHES_DF['Year-Month'].min()]
+test_period = MATCHES_DF.loc[(MATCHES_DF['Year-Month']== MATCHES_DF['Year-Month'].min())]
 
-#Merge on both player's ratings
-period_df = pd.merge(period_df,RATINGS_DF,how='inner',left_on='Player 1',right_index=True)
-period_df.rename(index=str,columns = {"rat":"rat_1","RD":"RD_1","vol":"vol_1"},inplace=True)
-period_df = pd.merge(period_df,RATINGS_DF,how='inner',left_on='Player 2',right_index=True)
-period_df.rename(index=str,columns = {"rat":"rat_2","RD":"RD_2","vol":"vol_2"},inplace=True)
-period_df['g_12'] = period_df['RD_1'].apply(calc_g_ij)
-period_df['E_12'] = period_df.apply(lambda row: calc_E_ij(row['rat_1'],row['rat_2'],row['g_12']),axis=1)
-period_df['v_12'] = period_df.apply(lambda row: calc_v_inv_ij(row['E_12'],row['g_12']),axis=1)
-period_df['perf_sum_12'] = period_df.apply(lambda row: calc_delta_ij(row['E_12'],row['g_12'],row['Outcome']),axis=1)
-period_agg_df = period_df[['Player 1','v_12','perf_sum_12']].groupby('Player 1').sum()
-del period_df
-period_agg_df['v'] = 1/period_agg_df['v_12'] 
-period_agg_df['delta'] = period_agg_df['v'] *period_agg_df['perf_sum_12']
-period_agg_df.drop(['v_12'],axis=1,inplace=True)
-period_agg_df = pd.merge(period_agg_df,RATINGS_DF,how='inner',left_on='Player 1',right_index=True)
-period_agg_df['vol_new'] = period_agg_df.apply(lambda row: update_vol_i(row['vol'],row['v'],row['delta'],row['RD']),axis=1)
-period_agg_df['RD_new'] = period_agg_df.apply(lambda row: update_rd_i(row['RD'],row['v']),axis=1)
-period_agg_df['rat_new'] = period_agg_df.apply(lambda row: update_rat_i(row['RD_new'],row['rat'],row['perf_sum_12']),axis=1)
+period_agg_df = update_glickos(test_period)
 
-#for period in MATCHES_DF['Year-Month'].unique():
-#    period_df = MATCHES_DF[MATCHES_DF['Year-Month']==period]
-#    period_df.merge
-#    update_glikos(period_df) 
+RATINGS_DF.update(period_agg_df,overwrite=True)
+
+for period in MATCHES_DF['Year-Month'].unique():
+    print(period)
+    period_df = MATCHES_DF[MATCHES_DF['Year-Month']==period]
+    updated_ratings = update_glickos(period_df)
+    RATINGS_DF.update(updated_ratings,overwrite=True)
