@@ -7,11 +7,11 @@ Created on Sat Apr 28 19:20:10 2018
 import pandas as pd
 import seaborn
 import math
-from matplotlib import pyplot as plt
 from scipy import optimize
 import numpy as np
 import os
-
+from IPython import embed
+from analysis_functions import plot_roc_curve
 """
 Source: http://glicko.net/glicko/glicko2.pdf
 
@@ -123,6 +123,8 @@ Step 8
                      
 """
 
+
+
 def calc_g_ij(RD_j):
     return 1.0/math.sqrt((1+(3*RD_j**2))/math.pi**2)
 
@@ -182,9 +184,9 @@ def update_glickos(period_df):
     #Merge on both player's ratings
     ##Preprocessing
     period_df = pd.merge(period_df,RATINGS_DF,how='inner',left_on='Player 1',right_index=True)
-    period_df.rename(index=str,columns = {"rat":"rat_1","RD":"RD_1","vol":"vol_1"},inplace=True)
+    period_df.rename(columns = {"rat":"rat_1","RD":"RD_1","vol":"vol_1"},inplace=True)
     period_df = pd.merge(period_df,RATINGS_DF,how='inner',left_on='Player 2',right_index=True)
-    period_df.rename(index=str,columns = {"rat":"rat_2","RD":"RD_2","vol":"vol_2"},inplace=True)
+    period_df.rename(columns = {"rat":"rat_2","RD":"RD_2","vol":"vol_2"},inplace=True)
     
     #Step 3 (not summed or inverted)
     period_df['g_12'] = period_df['RD_1'].apply(calc_g_ij)
@@ -196,7 +198,6 @@ def update_glickos(period_df):
     
     #Sum by player
     period_agg_df = period_df[['Player 1','v_12','perf_sum_12']].groupby('Player 1').sum()
-    del period_df
     
     #Complete 3 (invert)
     period_agg_df['v'] = 1/period_agg_df['v_12'] 
@@ -215,9 +216,10 @@ def update_glickos(period_df):
     period_agg_df['RD'] = period_agg_df.apply(lambda row: update_rd_i(row['RD'],row['v'],row['vol']),axis=1)
     period_agg_df['rat'] = period_agg_df.apply(lambda row: update_rat_i(row['RD'],row['rat'],row['perf_sum_12']),axis=1)
 
-    output = period_agg_df[['rat','RD','vol']]
-    #Return new figures
-    return output
+    output_ratings = period_agg_df[['rat','RD','vol']]
+
+    output_predictions = period_df[['E_12']]
+    return output_ratings, output_predictions
 
 #Need to impliment
 def apply_match_winning_odds(args):
@@ -255,9 +257,11 @@ def check_profitability(df,thresholds):
 
 CURRENT_DIR = os.getcwd()
 
-ROOT = CURRENT_DIR.replace("Scripts\\2. Analysis","")
 
-MATCHES_DF = pd.read_csv(ROOT + "Data\\tennis-data.co.uk\\Clean data 2001 - 2016.csv",index_col=0)
+
+ROOT = CURRENT_DIR.replace("Scripts/2. Analysis","")
+
+MATCHES_DF = pd.read_csv(ROOT + "/Data/tennis-data.co.uk/Clean data 2001 - 2016.csv",index_col=0)
 
 TAU = 0.6
 EPSILON = 0.000001
@@ -268,18 +272,20 @@ MATCHES_DF['Date'] = pd.to_datetime(MATCHES_DF['Date'])
 #Looking at match level data. Therefore only taking 1 observation per match, and first one (with starting ELOs)
 MATCHES_DF = MATCHES_DF[MATCHES_DF['set_num']==1]
 
-MATCHES_DF.drop(['winner_prob','loser_prob','set_num','first_to','Surface'],axis=1,inplace=True)
+MATCHES_DF.drop(['loser_prob','set_num','first_to','Surface'],axis=1,inplace=True)
 
 #Winner of ovearll match is always player 1
-MATCHES_DF['Outcome'] = 1.0
+MATCHES_DF['Outcome'] = 1
 
 #Duplicate df
 opp_df = MATCHES_DF.copy()
 
-opp_df['Outcome'] = 0.0
+opp_df['Outcome'] = 0
 opp_df.rename(index=str,columns = {"Player 1":"Player 2","Player 2":"Player 1"},inplace=True)
 
 MATCHES_DF = MATCHES_DF.append(opp_df,ignore_index=True,sort=True)
+
+MATCHES_DF.reset_index(inplace=True,drop=True)
 
 MATCHES_DF['Year-Month'] = MATCHES_DF['Date'].dt.to_period('M')
 
@@ -293,15 +299,46 @@ RATINGS_DF['RD'] = 350/173.7178
 
 RATINGS_DF['vol'] = 0.06
 
-#Testing
+#Testing - for now only taking first 5 years
+
+
+MATCHES_DF = MATCHES_DF.loc[(MATCHES_DF['Year-Month'] <  MATCHES_DF['Year-Month'].min() + 36)]
+
+
+"""
 test_period = MATCHES_DF.loc[(MATCHES_DF['Year-Month']== MATCHES_DF['Year-Month'].min())]
 
-period_agg_df = update_glickos(test_period)
+updated_ratings, period_predictions = update_glickos(test_period)
 
-RATINGS_DF.update(period_agg_df,overwrite=True)
+#RATINGS_DF.update(updated_ratings,overwrite=True)
 
+#test_2 = pd.merge(MATCHES_DF,period_predictions,how='left',left_index=True,right_index=True)
+"""
+
+
+N = 1
 for period in MATCHES_DF['Year-Month'].unique():
     print(period)
     period_df = MATCHES_DF[MATCHES_DF['Year-Month']==period]
-    updated_ratings = update_glickos(period_df)
+    updated_ratings, period_predictions = update_glickos(period_df)
     RATINGS_DF.update(updated_ratings,overwrite=True)
+    if N == 1:
+        MATCHES_DF = pd.merge(MATCHES_DF,period_predictions,how='left',left_index=True,right_index=True)
+    else:
+        MATCHES_DF.update(period_predictions,overwrite=True)
+    N += 1
+
+assert MATCHES_DF[MATCHES_DF.E_12.isnull()].shape[0] == 0
+
+test = MATCHES_DF[MATCHES_DF['Year-Month'] != MATCHES_DF['Year-Month'].min()]
+
+test = MATCHES_DF[((MATCHES_DF['Year-Month'] <  MATCHES_DF['Year-Month'].min() + 13)
+ & (MATCHES_DF['Outcome'] ==1)) | ((MATCHES_DF['Year-Month'] >=  MATCHES_DF['Year-Month'].min() + 13)
+& (MATCHES_DF['Outcome'] ==0))]
+
+test_1 = plot_roc_curve(test['Outcome'], test['E_12'])
+
+test = test[test['winner_prob'].notnull()]
+test_2 = plot_roc_curve(test['Outcome'], test['winner_prob'])
+embed()
+
