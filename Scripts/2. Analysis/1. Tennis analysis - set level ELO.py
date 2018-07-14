@@ -11,6 +11,8 @@ import elo_functions as elo
 from matplotlib import pyplot as plt
 from scipy import optimize
 import numpy as np
+from analysis_functions import plot_roc_curve
+import os
 
 #Solve recursive formula for base case, designed to be applied rowwise to pandas df
 def match_winning_odds(args):
@@ -47,9 +49,11 @@ def check_profitability(df,thresholds):
 #1. Load cleaned Tennis data 
 ############################################################################
 
-root = "C:/Users/oliver.cairns/Desktop/sports_betting_analysis/"
+CURRENT_DIR = os.getcwd()
 
-elo_df = pd.read_csv(root + "Data/tennis-data.co.uk/Clean data 2001 - 2016.csv")
+ROOT = CURRENT_DIR.replace("Scripts/2. Analysis","")
+
+elo_df = pd.read_csv(ROOT + "/Data/tennis-data.co.uk/Clean data 2001 - 2016.csv")
 
 #Other cleaning and sorting
 elo_df['Date'] = pd.to_datetime(elo_df['Date'])
@@ -70,6 +74,7 @@ k_star =  15.42498011
 #Output data is the set level data (now with columns for player 1 winning chance and player 1 and 2 rating prior to game)
 brier_score, output_data,ratings_dict = elo.calc_brier_and_elos(elo_df,k_star,ratings_dummy=True)
 
+'''
 #Plot ELOs of best players. Also good visual check everything is working correctly
 plt.plot(ratings_dict['Federer R.']['historic_dates'],ratings_dict['Federer R.']['historic_ratings'],'red',label='Roger Federer')
 plt.plot(ratings_dict['Nadal R.']['historic_dates'],ratings_dict['Nadal R.']['historic_ratings'],'green',label='Rafael Nadal')
@@ -77,6 +82,7 @@ plt.plot(ratings_dict['Murray A.']['historic_dates'],ratings_dict['Murray A.']['
 plt.plot(ratings_dict['Djokovic N.']['historic_dates'],ratings_dict['Djokovic N.']['historic_ratings'],'brown',label='Novak Djokovic')
 plt.legend(loc='upper left')
 plt.show()
+'''
 
 #Only evaluate betting on games after 1st 2 years - allow ELO to callibrate
 betting_df = output_data[output_data['Date'].dt.year > 2002]
@@ -93,6 +99,31 @@ betting_df['k_factor'] = k_star
 #Compute my model's match winning odds. Hopefully they are more accurate than bookmaker :)
 betting_df['model_prob'] = betting_df[['e1','Elo 1','Elo 2','first_to','k_factor']].apply(match_winning_odds, axis=1)
 betting_df['model_loser_prob'] = 1.0 - betting_df['model_prob']
+
+MATCHES_DF = betting_df
+
+test = MATCHES_DF[MATCHES_DF['Year-Month'] != MATCHES_DF['Year-Month'].min()]
+
+test['Outcome']= test['Outcome'].apply(lambda x: int(x))
+
+#Duplicate df
+opp_df = test.copy()
+
+opp_df['Outcome'] = 0
+opp_df.rename(index=str,columns = {"Player 1":"Player 2","Player 2":"Player 1"},inplace=True)
+
+test = test.append(opp_df,ignore_index=True,sort=True)
+
+test.reset_index(inplace=True,drop=True)
+
+test = MATCHES_DF[((MATCHES_DF['Year-Month'] <  MATCHES_DF['Year-Month'].min() + 60)
+ & (MATCHES_DF['Outcome'] ==1)) | ((MATCHES_DF['Year-Month'] >=  MATCHES_DF['Year-Month'].min() + 60)
+& (MATCHES_DF['Outcome'] ==0))]
+
+
+
+test_1 = plot_roc_curve(test['Outcome'], test['E_12'])
+
 
 #check profitability, with different thresholds = how much higher my probability has to be than bookie odds before I bet.
 check_profitability(df=betting_df,thresholds = [0,0.01,0.05,0.10,0.2])

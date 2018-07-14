@@ -302,7 +302,7 @@ RATINGS_DF['vol'] = 0.06
 #Testing - for now only taking first 5 years
 
 
-MATCHES_DF = MATCHES_DF.loc[(MATCHES_DF['Year-Month'] <  MATCHES_DF['Year-Month'].min() + 36)]
+#MATCHES_DF = MATCHES_DF.loc[(MATCHES_DF['Year-Month'] <  MATCHES_DF['Year-Month'].min() + 36)]
 
 
 """
@@ -332,8 +332,8 @@ assert MATCHES_DF[MATCHES_DF.E_12.isnull()].shape[0] == 0
 
 test = MATCHES_DF[MATCHES_DF['Year-Month'] != MATCHES_DF['Year-Month'].min()]
 
-test = MATCHES_DF[((MATCHES_DF['Year-Month'] <  MATCHES_DF['Year-Month'].min() + 13)
- & (MATCHES_DF['Outcome'] ==1)) | ((MATCHES_DF['Year-Month'] >=  MATCHES_DF['Year-Month'].min() + 13)
+test = MATCHES_DF[((MATCHES_DF['Year-Month'] <  MATCHES_DF['Year-Month'].min() + 60)
+ & (MATCHES_DF['Outcome'] ==1)) | ((MATCHES_DF['Year-Month'] >=  MATCHES_DF['Year-Month'].min() + 60)
 & (MATCHES_DF['Outcome'] ==0))]
 
 test_1 = plot_roc_curve(test['Outcome'], test['E_12'])

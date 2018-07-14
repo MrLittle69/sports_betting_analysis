@@ -69,11 +69,7 @@ def calc_brier_and_elos(elo_df,k_factor,ratings_dummy):
         
     for i, game in elo_df.iterrows():
         current_brier += update_elos_and_winning_chances(game=game,game_index = i, ratings_dict = ratings_dict, k_factor=k_factor, elo_df = elo_df,ratings_dummy = ratings_dummy)
-    
-    print("Brier: ",current_brier)
-    print("K factor: ",k_factor)
-    print()
-    
+
     if ratings_dummy:
         return current_brier,elo_df, ratings_dict
     else:
