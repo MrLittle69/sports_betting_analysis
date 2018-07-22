@@ -10,9 +10,8 @@ import elo_functions as elo
 from matplotlib import pyplot as plt
 from scipy import optimize
 import numpy as np
-from analysis_functions import plot_roc_curve
 import os
-from analysis_functions import check_profitability, flip_underdog_wins
+from analysis_functions import check_profitability, flip_underdog_wins, plot_roc_curve
 from IPython import embed
 ############################################################################
 #1. Load cleaned Tennis data 
@@ -70,15 +69,10 @@ betting_df = betting_df[betting_df['set_num']==1]
 #Winner of ovearll match is always player 1
 betting_df['Outcome'] = 1.0
 
-
 #Compute my model's match winning odds. Hopefully they are more accurate than bookmaker :)
 betting_df['model_prob'] = betting_df[['E 1','Rating 1','Rating 2','first_to','K Factor']].apply(match_winning_odds, axis=1)
 
-betting_df['Year-Month'] = betting_df['Date'].dt.to_period('M')
-
 betting_df['Outcome']= betting_df['Outcome'].apply(lambda x: int(x))
-
-embed()
 
 betting_df[['model_prob','Player 1','Player 2','Outcome']] = \
 betting_df[['model_prob','Player 1','Player 2','Outcome']].apply(flip_underdog_wins,axis=1).apply(pd.Series)
@@ -87,7 +81,7 @@ betting_df[['model_prob','Player 1','Player 2','Outcome']].apply(flip_underdog_w
 
 test_1 = plot_roc_curve(betting_df['Outcome'], betting_df['model_prob'])
 
-clean_df = 
+has_odds_df = betting_df[betting_df['winner_prob'].notnull()]
 
 
 #check profitability, with different thresholds = how much higher my probability has to be than bookie odds before I bet.

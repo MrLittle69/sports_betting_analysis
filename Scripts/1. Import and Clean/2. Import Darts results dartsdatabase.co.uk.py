@@ -3,7 +3,7 @@ import pandas as pd
 import bs4
 import requests
 from IPython import embed
-
+from analysis_functions import check_profitability, flip_underdog_wins
 
 # params
 player_url = 'http://www.dartsdatabase.co.uk/PlayerStats.aspx?statKey=1&pg='
