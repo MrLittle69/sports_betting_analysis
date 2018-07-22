@@ -12,6 +12,7 @@ import numpy as np
 import os
 from IPython import embed
 from analysis_functions import plot_roc_curve
+from analysis_functions import flip_underdog_wins
 """
 Source: http://glicko.net/glicko/glicko2.pdf
 
@@ -123,8 +124,6 @@ Step 8
                      
 """
 
-
-
 def calc_g_ij(RD_j):
     return 1.0/math.sqrt((1+(3*RD_j**2))/math.pi**2)
 
@@ -190,11 +189,11 @@ def update_glickos(period_df):
     
     #Step 3 (not summed or inverted)
     period_df['g_12'] = period_df['RD_1'].apply(calc_g_ij)
-    period_df['E_12'] = period_df.apply(lambda row: calc_E_ij(row['rat_1'],row['rat_2'],row['g_12']),axis=1)
-    period_df['v_12'] = period_df.apply(lambda row: calc_v_inv_ij(row['E_12'],row['g_12']),axis=1)
+    period_df['E 1'] = period_df.apply(lambda row: calc_E_ij(row['rat_1'],row['rat_2'],row['g_12']),axis=1)
+    period_df['v_12'] = period_df.apply(lambda row: calc_v_inv_ij(row['E 1'],row['g_12']),axis=1)
     
     #Step 4 (not summed or multiplied by v)
-    period_df['perf_sum_12'] = period_df.apply(lambda row: calc_delta_ij(row['E_12'],row['g_12'],row['Outcome']),axis=1)
+    period_df['perf_sum_12'] = period_df.apply(lambda row: calc_delta_ij(row['E 1'],row['g_12'],row['Outcome']),axis=1)
     
     #Sum by player
     period_agg_df = period_df[['Player 1','v_12','perf_sum_12']].groupby('Player 1').sum()
@@ -218,7 +217,7 @@ def update_glickos(period_df):
 
     output_ratings = period_agg_df[['rat','RD','vol']]
 
-    output_predictions = period_df[['E_12']]
+    output_predictions = period_df[['E 1']]
     return output_ratings, output_predictions
 
 #Need to impliment
@@ -256,8 +255,6 @@ def check_profitability(df,thresholds):
 ############################################################################
 
 CURRENT_DIR = os.getcwd()
-
-
 
 ROOT = CURRENT_DIR.replace("Scripts/2. Analysis","")
 
@@ -305,7 +302,6 @@ RATINGS_DF['vol'] = 0.06
 #MATCHES_DF = MATCHES_DF.loc[(MATCHES_DF['Year-Month'] <  MATCHES_DF['Year-Month'].min() + 36)]
 
 
-"""
 test_period = MATCHES_DF.loc[(MATCHES_DF['Year-Month']== MATCHES_DF['Year-Month'].min())]
 
 updated_ratings, period_predictions = update_glickos(test_period)
@@ -313,8 +309,6 @@ updated_ratings, period_predictions = update_glickos(test_period)
 #RATINGS_DF.update(updated_ratings,overwrite=True)
 
 #test_2 = pd.merge(MATCHES_DF,period_predictions,how='left',left_index=True,right_index=True)
-"""
-
 
 N = 1
 for period in MATCHES_DF['Year-Month'].unique():
@@ -328,17 +322,20 @@ for period in MATCHES_DF['Year-Month'].unique():
         MATCHES_DF.update(period_predictions,overwrite=True)
     N += 1
 
-assert MATCHES_DF[MATCHES_DF.E_12.isnull()].shape[0] == 0
+assert MATCHES_DF[MATCHES_DF.E 1.isnull()].shape[0] == 0
 
 test = MATCHES_DF[MATCHES_DF['Year-Month'] != MATCHES_DF['Year-Month'].min()]
 
-test = MATCHES_DF[((MATCHES_DF['Year-Month'] <  MATCHES_DF['Year-Month'].min() + 60)
- & (MATCHES_DF['Outcome'] ==1)) | ((MATCHES_DF['Year-Month'] >=  MATCHES_DF['Year-Month'].min() + 60)
-& (MATCHES_DF['Outcome'] ==0))]
 
-test_1 = plot_roc_curve(test['Outcome'], test['E_12'])
+prediction,player_1,player_2,outcome
+
+test[['E 1','Player 1','Player 2','Outcome']] = \
+test[['E 1','Player 1','Player 2','Outcome']].apply(flip_underdog_wins,axis=1)
+
+
+test_1 = plot_roc_curve(test['Outcome'], test['E 1'])
 
 test = test[test['winner_prob'].notnull()]
-test_2 = plot_roc_curve(test['Outcome'], test['winner_prob'])
 embed()
+test_2 = plot_roc_curve(test['Outcome'], test['winner_prob'])
 
