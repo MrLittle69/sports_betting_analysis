@@ -5,7 +5,7 @@ import pandas as pd
 
 from IPython import embed
 
-root = "C:/Users/oliver.cairns/Desktop/sports_betting_analysis/"
+root = "C:/Users/oliver.cairns/Desktop/sandbox/ad_hoc/sports_betting_analysis/"
 
 start_year, end_year = [2010,2018]
 
@@ -16,7 +16,7 @@ chrome_options.add_argument("--window-size=1920x1080")
 
 # download the chrome driver from https://sites.google.com/a/chromium.org/chromedriver/downloads and put it in the
 # current directory
-chrome_driver = os.getcwd() + "/chromedriver.exe"
+chrome_driver = "chromedriver.exe"
 
 tournament_names = ["premier-league","pdc-world-championship"]
 
@@ -61,6 +61,7 @@ for i, tourn in enumerate(tourns):
 
             table = driver.find_element_by_id('tournamentTable')
             rows = table.find_elements_by_class_name('deactivate')
+            embed()
             for row in rows:
                 try:
                     players = row.find_element_by_class_name('name').text

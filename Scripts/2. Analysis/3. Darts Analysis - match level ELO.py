@@ -6,7 +6,7 @@ Created on Sat Apr 28 19:20:10 2018
 """
 import pandas as pd
 import seaborn
-
+from IPython import embed
 import elo_functions as elo
 from matplotlib import pyplot as plt
 from scipy import optimize
@@ -60,9 +60,8 @@ def outcome_map(result):
 #1. Load darts data 
 ############################################################################
 
-root = "C:/Users/oliver.cairns/Desktop/sports_betting_analysis/"
 
-matches_df = pd.read_excel(root + "Data/dartsdatabase/Results2.xlsx")
+matches_df = pd.read_excel("../../Data/dartsdatabase/Results2.xlsx")
 
 
 ############################################################################
@@ -110,7 +109,7 @@ elo_df['year'] =elo_df['Date'].dt.year
 
 #Merge on odds data - quite crude.
 
-odds_df = pd.read_excel(root + "/Data/oddschecker/Darts_odds.xlsx")
+odds_df = pd.read_excel("../../Data/oddschecker/Darts_odds.xlsx")
 
 odds_df['p1_prob'] = odds_df['odds_1'].apply(convert_frac_to_prob)
 odds_df['p2_prob'] = odds_df['odds_2'].apply(convert_frac_to_prob)
@@ -138,6 +137,7 @@ odds_df = odds_df.append(opp_df,ignore_index=True)
     
 elo_df = pd.merge(odds_df, elo_df,  how='right',left_on=['Surname 1','Surname 2','Tourn','score'],right_on=['Surname 1','Surname 2','Tourn','score'],indicator=True)
 
+embed()
 #Earliest fixtures first
 elo_df.sort_values(by=['Date'],inplace=True)
 
