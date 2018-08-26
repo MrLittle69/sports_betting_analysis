@@ -6,14 +6,11 @@ from IPython import embed
 
 
 # params
-player_url = 'http://www.dartsdatabase.co.uk/PlayerStats.aspx?statKey=1&pg='
 game_url = 'http://www.dartsdatabase.co.uk/PlayerDetails.aspx?PlayerKey=1&organPd=All&tourns=All&plStat=2#PlayerResults'
 count = 0
 waiting_period = 0
 max_player_page = 10
 max_results_page = 60
-
-root = "C:/Users/oliver.cairns/Desktop/sports_betting_analysis/"
 
 headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36'}
 
