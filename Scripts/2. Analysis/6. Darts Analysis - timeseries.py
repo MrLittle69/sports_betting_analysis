@@ -1,18 +1,14 @@
 import pandas as pd
 import os
 from IPython import embed
-from pyramid.arima import auto_arima
 import matplotlib.pyplot as plt
 from scipy import optimize
 from scipy.stats import norm
 from statistics import variance
 import numpy as np
 from math import sqrt
-CURRENT_DIR = os.getcwd()
 
-ROOT = CURRENT_DIR.replace("Scripts/2. Analysis","")
-
-MATCHES_DF = pd.read_excel(ROOT + "/Data/dartsdatabase/Averages.xlsx")
+MATCHES_DF = pd.read_excel("../../Data/dartsdatabase/Averages.xlsx")
 
 
 ############################################################################
