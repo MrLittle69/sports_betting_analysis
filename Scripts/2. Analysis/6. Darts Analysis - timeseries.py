@@ -7,10 +7,8 @@ from scipy.stats import norm
 from statistics import variance
 import numpy as np
 from math import sqrt
-from analysis_functions import plot_roc_curve
-from analysis_functions import flip_underdog_wins
 
-MATCHES_DF = pd.read_excel("..\\..\\Data\\dartsdatabase\\Averages.xlsx")
+MATCHES_DF = pd.read_excel("../../Data/dartsdatabase/Averages.xlsx")
 
 
 ############################################################################

@@ -4,8 +4,15 @@ import os
 import pandas as pd
 
 from IPython import embed
+from tqdm import tqdm
+from time import sleep
 
+sleeptime = 5
+
+<<<<<<< HEAD
 root = "C:/Users/oliver.cairns/Desktop/sandbox/ad_hoc/sports_betting_analysis/"
+=======
+>>>>>>> 94000d710f6e00b203a2bfd550f8e9557d96f3e6
 
 start_year, end_year = [2010,2018]
 
@@ -14,15 +21,7 @@ chrome_options = Options()
 chrome_options.add_argument("--headless")
 chrome_options.add_argument("--window-size=1920x1080")
 
-# download the chrome driver from https://sites.google.com/a/chromium.org/chromedriver/downloads and put it in the
-# current directory
-chrome_driver = "chromedriver.exe"
-
-tournament_names = ["premier-league","pdc-world-championship"]
-
-driver = webdriver.Chrome(chrome_options=chrome_options, executable_path=chrome_driver)
-
-odds_df = pd.DataFrame()
+driver = webdriver.Chrome(chrome_options=chrome_options)
 
 #1. scrape all tournaments
 
@@ -42,11 +41,19 @@ links = [x.get_attribute('href') for x in links]
 
 tourns = [link.replace('/results/','') for link in links if '/results/' in link]
 
-for i, tourn in enumerate(tourns):
-    print('--------------')
+odds_df = pd.read_csv("../../Data/oddschecker/Darts_odds.csv")
+
+prev_tourns = odds_df['tournament_name'].unique()
+
+tourns = [t for t in tourns if t not in prev_tourns]
+
+for i, tourn in tqdm(enumerate(tourns)):
     print(i)
+    print(i/len(tourns))
+    print('--------------')
     
     for year in range(start_year,end_year+1):
+        sleep(sleeptime)
         print('Tournament: ',tourn)
         print('Year: ',year)
         print()
@@ -55,30 +62,36 @@ for i, tourn in enumerate(tourns):
         else:
             page_url = tourn + "-" + str(year) + "/results/"
         
-        print(page_url)
+        #print(page_url)
         try:
             driver.get(page_url)
 
             table = driver.find_element_by_id('tournamentTable')
-            rows = table.find_elements_by_class_name('deactivate')
-            embed()
+            #rows = table.find_elements_by_class_name('deactivate')
+            match_date = 'missing'
+
+            rows = table.find_elements_by_tag_name('tr')
             for row in rows:
                 try:
-                    players = row.find_element_by_class_name('name').text
-                    score = row.find_element_by_class_name('table-score').text
-                    odds_1 = row.find_elements_by_class_name('odds-nowrp')[0].text
-                    odds_2 = row.find_elements_by_class_name('odds-nowrp')[1].text
-                    #add atrributes to list
-                    odds_hash = {'players':players, 'odds_1': odds_1, \
-                        'odds_2': odds_2, 'year': year,'tournament_name':tourn,'score':score}
-                    odds_df = odds_df.append(odds_hash,ignore_index=True)
-                except:
-                    print('fail')
+                    if row.get_attribute('class') == 'center nob-border':
+                        match_date = row.find_element_by_tag_name('th').text 
+                    if row.get_attribute('class') in ['odd deactivate', ' deactivate']:
+                        players = row.find_element_by_class_name('name').text
+                        score = row.find_element_by_class_name('table-score').text
+                        odds_1 = row.find_elements_by_class_name('odds-nowrp')[0].text
+                        odds_2 = row.find_elements_by_class_name('odds-nowrp')[1].text
+                        #add atrributes to list
+                        odds_hash = {'players':players, 'odds_1': odds_1, \
+                        'odds_2': odds_2, 'year': year,'tournament_name':tourn,'score':score, 'date' :match_date}
+                        odds_df = odds_df.append(odds_hash,ignore_index=True)
+                except Exception as e:
+                    print('fail: {}'.format(e))
                     pass
                     
-        except:
+        except Exception as e:
+            print('fail: {}'.format(e))
             pass
     if i % 5 == 0:
-        odds_df.to_excel(root+"/Data/oddschecker/Darts_odds.xlsx")
+        odds_df.to_csv("../../Data/oddschecker/Darts_odds.csv")
 
-odds_df.to_excel(root+"/Data/oddschecker/Darts_odds.xlsx")
+odds_df.to_csv("../../Data/oddschecker/Darts_odds.csv")
