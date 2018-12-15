@@ -9,10 +9,6 @@ from time import sleep
 
 sleeptime = 5
 
-<<<<<<< HEAD
-root = "C:/Users/oliver.cairns/Desktop/sandbox/ad_hoc/sports_betting_analysis/"
-=======
->>>>>>> 94000d710f6e00b203a2bfd550f8e9557d96f3e6
 
 start_year, end_year = [2010,2018]
 

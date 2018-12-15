@@ -67,11 +67,13 @@ matches_df = pd.wide_to_long(matches_df, stubnames='O_', i='match_id', j='set_nu
 matches_df['set_num'] = pd.to_numeric(matches_df['set_num'])
 
 #Fix so can use default elo functions
-matches_df.rename(index=str, columns={"Winner": "Player 1", "Loser": "Player 2","O_":"Outcome"},inplace=True)
+matches_df.rename(index=str, columns={"Winner": "Player 1", 
+            "Loser": "Player 2","O_":"Outcome"},inplace=True)
 
 #Take subset - which columns are we using for this analysis?
 
-elo_df = matches_df.loc[:,['Player 1','Player 2','Outcome','set_num','Date','match_id','winner_prob','loser_prob','first_to','Surface']]
+elo_df = matches_df.loc[:,['Player 1','Player 2','Outcome',
+        'set_num','Date','match_id','winner_prob','loser_prob','first_to','Surface']]
 
 #Combine carpets with grass - fewer permuations for optimisation
 elo_df.loc[elo_df['Surface'] == "Carpet", 'Surface'] = "Grass"

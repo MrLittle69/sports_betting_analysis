@@ -1,4 +1,4 @@
-from sklearn.metrics import roc_curve, auc
+from sklearn.metrics import roc_curve, auc, log_loss
 from matplotlib import pyplot as plt
 from IPython import embed
 
@@ -25,7 +25,6 @@ def flip_underdog_wins(row):
         return prediction,player_1,player_2,1
     else:
         return 1.0-prediction,player_2,player_1,0
-
 
 
 #Check strategy profitability different confidence thresholds (how much does payoff have to exceed odds for me to bet?)
