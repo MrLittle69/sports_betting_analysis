@@ -1,4 +1,4 @@
-# tennis_analysis
+# sports_betting_analysis
 
 This project uses historic sports results data and betting odds to test the accuracy of results forecasting models. 
 
